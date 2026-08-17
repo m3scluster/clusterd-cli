@@ -106,7 +106,38 @@ Commands:
 %sSee 'mesos help <command>' for more information on a specific command.
 `, rows.String())
 }
-func (a *App) autocomplete(args []string, stdout io.Writer) {
+func(a *App) autocomplete(args []string, stdout io.Writer) {
+	if len(args) > 1 {
+		if entry, ok := a.registry.Get(args[1]); ok {
+			var buf bytes.Buffer
+			entry.Run([]string{"--help"}, nil, &buf, &bytes.Buffer{})
+			words := []string{"-h", "--help"}
+			for _, line := range strings.Split(buf.String(), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "Usage:") || strings.HasPrefix(line, "Options:") || strings.HasPrefix(line, "Commands:") || strings.HasPrefix(line, "Interacts with") {
+					continue
+				}
+				fields := strings.Fields(line)
+				if len(fields) > 0 && !strings.HasPrefix(fields[0], "-") {
+					words = append(words, fields[0])
+				}
+			}
+			sort.Strings(words)
+			current := ""
+			if len(args) > 0 {
+				current = args[0]
+			}
+			matches := []string{}
+			for _, word := range words {
+				if strings.HasPrefix(word, current) {
+					matches = append(matches, word)
+				}
+			}
+			fmt.Fprintln(stdout, "default")
+			fmt.Fprintln(stdout, strings.Join(matches, " "))
+			return
+		}
+	}
 	words := []string{"help"}
 	for _, entry := range a.registry.All() {
 		words = append(words, entry.Name())
