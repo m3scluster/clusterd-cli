@@ -1,0 +1,3 @@
+name = "m3s"
+description = "Manage M3S (Mesos 3 Scale) cluster"
+executable = "m3s"

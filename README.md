@@ -1,111 +1,70 @@
-# Mesos CLI in Go
+## Go Mesos CLI
 
-A Go-based CLI tool for managing and monitoring Apache Mesos clusters.
+Ein neues Go-basiertes CLI für Apache Mesos mit Plugin-Unterstützung.
 
-## Installation
+### Features
 
-The CLI is pre-built and ready to use at `/data/mesos-cli`. No dependencies are required.
+- Kompatibel mit Python mesos-cli API
+- Plugin-System für Erweiterungen
+- Tabellarische Ausgabe für Agent, Framework und Tasklisten
+- Autovervollständigung über `__autocomplete__`
 
-## Usage
-
-```bash
-./mesos-cli [command] [args...]
-```
-
-### Commands
-
-- **`state`**: Show cluster state summary
-  Displays cluster ID, name, number of slaves, and tasks.
-
-- **`slaves`**: List all slave nodes
-  Shows detailed information about each slave including CPU, memory, and disk resources.
-
-- **`tasks`**: List all tasks
-  Displays the total number of running tasks across all frameworks.
-
-- **`containers`**: List container status
-  Shows status of all containers including their state and resource usage.
-
-- **`help`** (or `-h`, `--help`): Show help
-  Displays this help message.
-
-## Examples
+### Build
 
 ```bash
-# Show cluster state
-./mesos-cli state
-
-# List all slaves
-./mesos-cli slaves
-
-# List all tasks
-./mesos-cli tasks
-
-# List container status
-./mesos-cli containers
+make
 ```
 
-## Accessing the Mesos UI
+### Konfiguration
 
-The Mesos web interface is available at: http://devtest.lab.internal:5050
+Standardkonfigurationspfad:
+- `$MESOS_CLI_CONFIG` oder `$XDG_CONFIG_HOME/mesos-cli/config.toml`
 
-Authentication:
-- Username: mesos
-- Password: test
+Beispielkonfiguration (`/tmp/mesos-cli-go-config.toml`):
 
-## Remote Access
+```toml
+[master]
+address = "https://devtest.lab.internal:5050"
+principal = "mesos"
+secret = "test"
+ssl_verify = false
 
-You can SSH to the servers where the containers run:
-- **devtest.lab.internal** - Primary Mesos server
-- **andreas-ki.lab.internal** - Additional Kubernetes server
+[agent]
+ssl = false
+ssl_verify = false
+timeout = 10
+```
 
-Use the SSH key `~/.ssh/hermes-agent` as user `andreas`.
+### Verwendung
 
-## Development
-
-The source code is located in `/data/mesos-cli-go/` and uses Go modules.
-
-To rebuild:
 ```bash
-cd /data/mesos-cli-go
-go build -o mesos-cli
+MESOS_CLI_CONFIG=/tmp/mesos-cli-go-config.toml ./mesos-cli agent list
+MESOS_CLI_CONFIG=/tmp/mesos-cli-go-config.toml ./mesos-cli task list --all
+MESOS_CLI_CONFIG=/tmp/mesos-cli-go-config.toml ./mesos-cli framework list --all
+MESOS_CLI_CONFIG=/tmp/mesos-cli-go-config.toml ./mesos-cli --help
 ```
 
-## Dependencies
+### Plugins
 
-- Go 1.21+
-- Apache Mesos 1.x API
+Plugins liegen im Verzeichnis `$MESOS_CLI_DIR/plugins/`. Jedes Plugin benötigt:
+- `plugin.toml` mit `{name, description, executable}`
+- Ausführbare Datei `executable`
 
-## Configuration
-
-The tool connects to Mesos at `http://devtest.lab.internal:5050` using basic authentication.
-
-You can modify the connection parameters in the `main.go` file:
-
-```go
-var (
-	mesosURL    = "http://devtest.lab.internal:5050"
-	mesosUser   = "mesos"
-	mesosPass   = "test"
-)
+Plugin-Verzeichnisstruktur:
+```
+plugins/
+├── compose/
+│   ├── compose        # ausführbare Datei
+│   └── plugin.toml    # name="compose", description="...", executable="compose"
+├── m3s/
+│   ├── m3s            # ausführbare Datei
+│   └── plugin.toml    # name="m3s", description="...", executable="m3s"
 ```
 
-## Supported Mesos API Endpoints
+### Ziel
 
-- `/api/v1/state` - Get cluster state
-- `/api/v1/states` - Get detailed state including tasks and containers
+Die Go-CLI emuliert die Python mesos-cli API und erweitert sie um:
+- Mesos-compose Plugin für Docker Compose Integration
+- Mesos-m3s Plugin für den M3S Scheduler
 
-## Features
-
-- 📊 Cluster state monitoring
-- 🖥️  Slave node inventory
-- 🔧 Container status tracking
-- 📋 Task management
-- ✅ Simple, dependency-free Go implementation
-- 🚀 Fast execution (no Python dependencies)
-
-## Notes
-
-- The tool is optimized for Mesos clusters with Docker containerizers
-- Resource usage is reported in the format the Mesos API returns
-- Container details include CPU, memory, and disk usage
+Die komplette API-Referenz findest du in der Python-Dokumentation von `avmesos-cli`.

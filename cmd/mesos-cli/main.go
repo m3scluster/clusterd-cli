@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"mesos-cli/internal/app"
 	"mesos-cli/internal/config"
-	"os"
 )
 
 func main() {
