@@ -56,6 +56,7 @@ type Framework struct {
 	Active   bool           `json:"active"`
 	Hostname string         `json:"hostname"`
 	Name     string         `json:"name"`
+	WebUIURL string         `json:"webui_url"`
 	Raw      map[string]any `json:"-"`
 }
 

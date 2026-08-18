@@ -41,6 +41,9 @@ func New(client TaskClient, config Configuration, httpClient *http.Client) *Task
 }
 func (*TaskPlugin) Name() string        { return "task" }
 func (*TaskPlugin) Description() string { return "Interacts with the tasks running in a Mesos cluster" }
+func (*TaskPlugin) Subcommands() []string {
+	return []string{"attach", "exec", "inspect", "kill", "list"}
+}
 func (p *TaskPlugin) Run(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
 		fmt.Fprint(stdout, help)

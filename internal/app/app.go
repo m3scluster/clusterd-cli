@@ -25,13 +25,26 @@ func New(cfg *config.Config, httpClient *http.Client) (*App, error) {
 	client := mesos.NewClient(cfg, httpClient)
 	builtins := []plugin.Plugin{
 		agentplugin.New(client),
-		composeplugin.New(),
+		composeplugin.New(client, cfg, httpClient),
 		configplugin.New(cfg, registry),
 		frameworkplugin.New(client),
-		m3splugin.New(),
+		m3splugin.New(client, cfg, httpClient),
 		taskplugin.New(client, cfg, httpClient),
 	}
 	for _, entry := range builtins {
+		if err := registry.Register(entry); err != nil {
+			return nil, err
+		}
+	}
+	paths, err := cfg.PluginPaths()
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range paths {
+		entry, err := plugin.LoadExternal(path)
+		if err != nil {
+			return nil, err
+		}
 		if err := registry.Register(entry); err != nil {
 			return nil, err
 		}
@@ -108,6 +121,22 @@ Commands:
 }
 
 func (a *App) autocomplete(args []string, stdout io.Writer) {
+	if len(args) > 1 {
+		if entry, ok := a.registry.Get(args[1]); ok {
+			if provider, ok := entry.(plugin.SubcommandProvider); ok {
+				matches := []string{}
+				for _, command := range provider.Subcommands() {
+					if strings.HasPrefix(command, args[0]) {
+						matches = append(matches, command)
+					}
+				}
+				sort.Strings(matches)
+				fmt.Fprintln(stdout, "default")
+				fmt.Fprintln(stdout, strings.Join(matches, " "))
+				return
+			}
+		}
+	}
 	words := []string{"help"}
 	for _, entry := range a.registry.All() {
 		words = append(words, entry.Name())

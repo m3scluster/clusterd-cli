@@ -64,6 +64,26 @@ func TestTasksPreservesQueryParameters(t *testing.T) {
 	}
 }
 
+func TestFrameworksExposeWebUIURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"frameworks": []map[string]any{{
+			"id":        "synthetic-framework-id",
+			"name":      "synthetic-framework",
+			"active":    true,
+			"webui_url": "http://framework.example.test:10000",
+		}}})
+	}))
+	defer server.Close()
+	client := NewClient(testConfig{master: server.URL}, server.Client())
+	frameworks, err := client.Frameworks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(frameworks) != 1 || frameworks[0].WebUIURL != "http://framework.example.test:10000" {
+		t.Fatalf("frameworks=%+v", frameworks)
+	}
+}
+
 func TestContainerIDReportsMissingStatus(t *testing.T) {
 	_, err := ContainerID(Task{ID: "synthetic-task-1"})
 	if err == nil || err.Error() != "Unable to obtain status information for task" {

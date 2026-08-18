@@ -82,3 +82,51 @@ address = "master.example.test:5050"
 		t.Fatal("expected missing plugin error")
 	}
 }
+
+func TestFrameworkCredentialsReadNamedPluginSection(t *testing.T) {
+	path := writeConfig(t, `[master]
+address = "master.example.test:5050"
+
+[compose.synthetic-compose]
+principal = "synthetic-compose-user"
+secret = "synthetic-compose-secret"
+ssl_verify = true
+
+[m3s.synthetic-m3s]
+principal = "synthetic-m3s-user"
+secret = "synthetic-m3s-secret"
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	compose, err := cfg.FrameworkCredentials("compose", "synthetic-compose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compose.Principal != "synthetic-compose-user" || compose.Secret != "synthetic-compose-secret" || !compose.SSLVerify {
+		t.Fatalf("unexpected compose credentials: %#v", compose)
+	}
+
+	m3s, err := cfg.FrameworkCredentials("m3s", "synthetic-m3s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m3s.Principal != "synthetic-m3s-user" || m3s.Secret != "synthetic-m3s-secret" || m3s.SSLVerify {
+		t.Fatalf("unexpected m3s credentials: %#v", m3s)
+	}
+}
+
+func TestFrameworkCredentialsRejectMissingFramework(t *testing.T) {
+	path := writeConfig(t, `[master]
+address = "master.example.test:5050"
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cfg.FrameworkCredentials("compose", "missing"); err == nil {
+		t.Fatal("expected missing framework credentials error")
+	}
+}

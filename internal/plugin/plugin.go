@@ -17,6 +17,10 @@ type Plugin interface {
 	Run(args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error)
 }
 
+type SubcommandProvider interface {
+	Subcommands() []string
+}
+
 type Registry struct{ plugins map[string]Plugin }
 
 func NewRegistry() *Registry { return &Registry{plugins: map[string]Plugin{}} }

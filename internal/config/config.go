@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AVENTER-UG/util/util"
 	"github.com/BurntSushi/toml"
 	"github.com/go-zookeeper/zk"
 )
@@ -21,9 +22,17 @@ type Config struct {
 }
 
 type fileConfig struct {
-	Plugins []string     `toml:"plugins"`
-	Master  masterConfig `toml:"master"`
-	Agent   agentConfig  `toml:"agent"`
+	Plugins []string                        `toml:"plugins"`
+	Master  masterConfig                    `toml:"master"`
+	Agent   agentConfig                     `toml:"agent"`
+	Compose map[string]FrameworkCredentials `toml:"compose"`
+	M3S     map[string]FrameworkCredentials `toml:"m3s"`
+}
+
+type FrameworkCredentials struct {
+	Principal string `toml:"principal"`
+	Secret    string `toml:"secret"`
+	SSLVerify bool   `toml:"ssl_verify"`
 }
 
 type masterConfig struct {
@@ -49,7 +58,7 @@ type agentConfig struct {
 
 func Load(explicitPath string) (*Config, error) {
 	path := explicitPath
-	if envPath := os.Getenv("MESOS_CLI_CONFIG"); envPath != "" {
+	if envPath := util.Getenv("MESOS_CLI_CONFIG", ""); envPath != "" {
 		path = envPath
 	}
 	if path == "" {
@@ -173,6 +182,22 @@ func (c *Config) AgentTimeout() int {
 }
 func (c *Config) AgentAuthentication() (string, string, bool) {
 	return c.data.Agent.Principal, c.data.Agent.Secret, c.data.Agent.Principal != "" && c.data.Agent.Secret != ""
+}
+func (c *Config) FrameworkCredentials(pluginName, frameworkName string) (FrameworkCredentials, error) {
+	var entries map[string]FrameworkCredentials
+	switch pluginName {
+	case "compose":
+		entries = c.data.Compose
+	case "m3s":
+		entries = c.data.M3S
+	default:
+		return FrameworkCredentials{}, fmt.Errorf("Unknown framework plugin '%s'", pluginName)
+	}
+	credentials, ok := entries[frameworkName]
+	if !ok {
+		return FrameworkCredentials{}, fmt.Errorf("Missing [%s.%s] configuration", pluginName, frameworkName)
+	}
+	return credentials, nil
 }
 func (c *Config) PluginPaths() ([]string, error) {
 	for _, path := range c.data.Plugins {
