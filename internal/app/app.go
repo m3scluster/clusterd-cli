@@ -58,7 +58,7 @@ func (a *App) Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int 
 		return 0
 	}
 	if args[0] == "--version" {
-		fmt.Fprintln(stdout, "Mesos Development CLI")
+		fmt.Fprintln(stdout, "ClusterD Development CLI")
 		return 0
 	}
 	if args[0] == "__autocomplete__" {
@@ -104,19 +104,19 @@ func (a *App) help() string {
 	for _, entry := range commands {
 		fmt.Fprintf(&rows, "  %s%s%s\n", entry.Name(), strings.Repeat(" ", width-len(entry.Name())+2), entry.Description())
 	}
-	return fmt.Sprintf(`Mesos CLI
+	return fmt.Sprintf(`ClusterD CLI
 
 Usage:
-  mesos (-h | --help)
-  mesos --version
-  mesos <command> [<args>...]
+  clusterd-cli (-h | --help)
+  clusterd-cli --version
+  clusterd-cli <command> [<args>...]
 
 Options:
   -h --help  Show this screen.
   --version  Show version info.
 
 Commands:
-%sSee 'mesos help <command>' for more information on a specific command.
+%sSee 'clusterd-cli help <command>' for more information on a specific command.
 `, rows.String())
 }
 

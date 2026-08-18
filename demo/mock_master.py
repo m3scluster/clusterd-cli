@@ -32,6 +32,26 @@ FRAMEWORKS = {
             "completed_tasks": [],
         },
         {
+            "id": "synthetic-compose-framework",
+            "active": True,
+            "hostname": "compose.example.test",
+            "name": "synthetic-compose",
+            "webui_url": "",
+            "tasks": [],
+            "unreachable_tasks": [],
+            "completed_tasks": [],
+        },
+        {
+            "id": "synthetic-m3s-framework",
+            "active": True,
+            "hostname": "m3s.example.test",
+            "name": "synthetic-m3s",
+            "webui_url": "",
+            "tasks": [],
+            "unreachable_tasks": [],
+            "completed_tasks": [],
+        },
+        {
             "id": "synthetic-framework-archived",
             "active": False,
             "hostname": "archive.example.test",
@@ -64,6 +84,18 @@ TASKS = {
     ]
 }
 
+COMPOSE_TASKS = [
+    {
+        "TaskID": "synthetic-compose-task",
+        "task_name": "demo:web:frontend",
+        "State": "TASK_RUNNING",
+        "MesosAgent": {"hostname": "node-01.example.test"},
+    }
+]
+
+M3S_STATUS = {"status": "healthy", "servers": 1, "agents": 2}
+KUBERNETES_STATUS = {"status": "ready", "nodes": 3}
+
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -72,6 +104,9 @@ class Handler(BaseHTTPRequestHandler):
             "/slaves": AGENTS,
             "/master/frameworks": FRAMEWORKS,
             "/tasks": TASKS,
+            "/api/compose/v0/tasks": COMPOSE_TASKS,
+            "/api/m3s/v0/status/m3s": M3S_STATUS,
+            "/api/m3s/v0/status/k8s": KUBERNETES_STATUS,
         }.get(path)
         if payload is None:
             self.send_error(404)
@@ -92,6 +127,10 @@ def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: mock_master.py <port-file>")
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    framework_url = f"http://127.0.0.1:{server.server_port}"
+    for framework in FRAMEWORKS["frameworks"]:
+        if framework["name"] in {"synthetic-compose", "synthetic-m3s"}:
+            framework["webui_url"] = framework_url
     Path(sys.argv[1]).write_text(str(server.server_port), encoding="utf-8")
     server.serve_forever()
 

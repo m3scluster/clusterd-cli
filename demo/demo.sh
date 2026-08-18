@@ -17,6 +17,8 @@ trap cleanup EXIT
 
 cd "$ROOT"
 make all >/dev/null
+cp ./mesos-cli "$TMPDIR_DEMO/clusterd-cli"
+CLI="$TMPDIR_DEMO/clusterd-cli"
 
 python3 demo/mock_master.py "$TMPDIR_DEMO/port" >"$TMPDIR_DEMO/mock.log" 2>&1 &
 MOCK_PID=$!
@@ -37,6 +39,16 @@ cat >"$TMPDIR_DEMO/config.toml" <<TOML
 [master]
 address = "http://127.0.0.1:$(<"$TMPDIR_DEMO/port")"
 ssl_verify = true
+
+[compose.synthetic-compose]
+principal = "synthetic-compose-user"
+secret = "synthetic-compose-secret"
+ssl_verify = true
+
+[m3s.synthetic-m3s]
+principal = "synthetic-m3s-user"
+secret = "synthetic-m3s-secret"
+ssl_verify = true
 TOML
 export MESOS_CLI_CONFIG="$TMPDIR_DEMO/config.toml"
 
@@ -55,26 +67,34 @@ scene() {
   if [[ -t 1 ]]; then
     printf '\033[2J\033[H'
   fi
-  printf '%sGo Mesos CLI%s  %s// %s%s\n\n' "$blue" "$reset" "$dim" "$1" "$reset"
+  printf '%sClusterD CLI%s  %s// %s%s\n\n' "$blue" "$reset" "$dim" "$1" "$reset"
 }
-run() {
-  printf '%s$%s %s\n' "$red" "$reset" "$*"
-  "$@"
+run_cli() {
+  printf '%s$%s ./clusterd-cli %s\n' "$red" "$reset" "$*"
+  "$CLI" "$@"
 }
 
 scene "Mesos agent inventory"
-run ./mesos-cli agent list
+run_cli agent list
 pause
 
 scene "active and archived Mesos frameworks"
-run ./mesos-cli framework list --all
+run_cli framework list --all
 pause
 
 scene "running and completed Mesos tasks"
-run ./mesos-cli task list --all
+run_cli task list --all
+pause
+
+scene "Mesos Compose services"
+run_cli compose list synthetic-compose
+pause
+
+scene "Mesos M3S cluster health"
+run_cli m3s status synthetic-m3s --m3s --kubernetes
 pause
 
 scene "inspect a Mesos task"
-run ./mesos-cli task inspect synthetic-task-running
-printf '\n%s✓ core Mesos commands completed%s\n' "$green" "$reset"
+run_cli task inspect synthetic-task-running
+printf '\n%s✓ Mesos, Mesos Compose, and Mesos M3S commands completed%s\n' "$green" "$reset"
 pause

@@ -1,6 +1,6 @@
-# Go Mesos CLI
+# ClusterD CLI
 
-Go Mesos CLI is a command-line client for Apache Mesos, implemented in Go and broadly compatible with the command model of the Python `mesos-cli`. It includes built-in commands for agents, frameworks, tasks, Mesos Compose, and M3S, plus support for external executable plugins.
+ClusterD CLI is a command-line client for Apache Mesos, implemented in Go and broadly compatible with the Python Mesos CLI command model. It includes built-in commands for agents, frameworks, tasks, Mesos Compose, and M3S, plus support for external executable plugins.
 
 Apache Mesos is a project of the Apache Software Foundation.
 
@@ -25,12 +25,12 @@ Apache Mesos is a project of the Apache Software Foundation.
 make all
 ```
 
-The resulting binary is written to `./mesos-cli`.
+The resulting binary is written to `./clusterd-cli`.
 
 To display the available command groups:
 
 ```bash
-./mesos-cli --help
+./clusterd-cli --help
 ```
 
 ## Configuration
@@ -79,32 +79,32 @@ path = "/mesos"
 ## Core commands
 
 ```bash
-./mesos-cli agent list
-./mesos-cli framework list --all
-./mesos-cli framework inspect synthetic-framework-id
-./mesos-cli task list --all
-./mesos-cli task inspect synthetic-task-id
-./mesos-cli config show
-./mesos-cli config plugins
+./clusterd-cli agent list
+./clusterd-cli framework list --all
+./clusterd-cli framework inspect synthetic-framework-id
+./clusterd-cli task list --all
+./clusterd-cli task inspect synthetic-task-id
+./clusterd-cli config show
+./clusterd-cli config plugins
 ```
 
-Use `./mesos-cli help <command>` for command-specific help.
+Use `./clusterd-cli help <command>` for command-specific help.
 
 ## Mesos Compose
 
 Compose is built into the binary; no external plugin manifest is required.
 
 ```bash
-./mesos-cli compose version synthetic-compose
-./mesos-cli compose info synthetic-compose
-./mesos-cli compose list synthetic-compose
-./mesos-cli compose launch synthetic-compose synthetic-project compose.yaml
-./mesos-cli compose update synthetic-compose synthetic-project compose.yaml
-./mesos-cli compose kill synthetic-compose synthetic-task-id
-./mesos-cli compose kill synthetic-compose prefix:synthetic-project:synthetic-service
-./mesos-cli compose restart synthetic-compose prefix:synthetic-project:synthetic-service
-./mesos-cli compose framework synthetic-compose reregister
-./mesos-cli compose framework synthetic-compose suppress
+./clusterd-cli compose version synthetic-compose
+./clusterd-cli compose info synthetic-compose
+./clusterd-cli compose list synthetic-compose
+./clusterd-cli compose launch synthetic-compose synthetic-project compose.yaml
+./clusterd-cli compose update synthetic-compose synthetic-project compose.yaml
+./clusterd-cli compose kill synthetic-compose synthetic-task-id
+./clusterd-cli compose kill synthetic-compose prefix:synthetic-project:synthetic-service
+./clusterd-cli compose restart synthetic-compose prefix:synthetic-project:synthetic-service
+./clusterd-cli compose framework synthetic-compose reregister
+./clusterd-cli compose framework synthetic-compose suppress
 ```
 
 `launch` and `update` send the selected Compose file to the framework API. `kill` accepts either a task ID or a service name. Service names use the `<prefix>:<project>:<service>` form.
@@ -114,17 +114,17 @@ Compose is built into the binary; no external plugin manifest is required.
 M3S is also built into the binary.
 
 ```bash
-./mesos-cli m3s list
-./mesos-cli m3s list --all
-./mesos-cli m3s kubeconfig synthetic-m3s
-./mesos-cli m3s version synthetic-m3s
-./mesos-cli m3s status synthetic-m3s --m3s
-./mesos-cli m3s status synthetic-m3s --m3s --kubernetes
-./mesos-cli m3s scale synthetic-m3s 3 --agent
-./mesos-cli m3s scale synthetic-m3s 3 --etcd
-./mesos-cli m3s cluster synthetic-m3s stop
-./mesos-cli m3s cluster synthetic-m3s start
-./mesos-cli m3s cluster synthetic-m3s restart
+./clusterd-cli m3s list
+./clusterd-cli m3s list --all
+./clusterd-cli m3s kubeconfig synthetic-m3s
+./clusterd-cli m3s version synthetic-m3s
+./clusterd-cli m3s status synthetic-m3s --m3s
+./clusterd-cli m3s status synthetic-m3s --m3s --kubernetes
+./clusterd-cli m3s scale synthetic-m3s 3 --agent
+./clusterd-cli m3s scale synthetic-m3s 3 --etcd
+./clusterd-cli m3s cluster synthetic-m3s stop
+./clusterd-cli m3s cluster synthetic-m3s start
+./clusterd-cli m3s cluster synthetic-m3s restart
 ```
 
 `status` accepts either status flag or both. `scale` requires exactly one target flag: `--agent` or `--etcd`.
@@ -135,7 +135,7 @@ External plugins are configured as directory paths in the top-level `plugins` ar
 
 ```toml
 plugins = [
-  "/opt/mesos-cli/plugins/synthetic-plugin",
+  "/opt/clusterd-cli/plugins/synthetic-plugin",
 ]
 ```
 
@@ -151,9 +151,9 @@ The executable path may be absolute or relative to the plugin directory. Argumen
 
 ## Demo
 
-[Watch the terminal demo](demo/mesos-cli-demo.mp4).
+[Watch the terminal demo](demo/clusterd-cli-demo.mp4).
 
-The reproducible Bash demo is available as [`demo/demo.sh`](demo/demo.sh). It runs the real `agent`, `framework`, and `task` commands against a local synthetic Mesos master. It does not contact an external Mesos cluster and does not include the Compose or M3S extensions.
+The reproducible Bash demo is available as [`demo/demo.sh`](demo/demo.sh). It runs the real `agent`, `framework`, `task`, Mesos Compose, and Mesos M3S commands against local synthetic APIs. It does not contact an external Mesos cluster.
 
 Run it locally with:
 

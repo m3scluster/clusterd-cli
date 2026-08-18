@@ -1,5 +1,5 @@
 SHELL:=bash
-BIN:=mesos-cli
+BIN:=clusterd-cli
 VERSION:=$(shell git describe --tags --abbrev=0 2>/dev/null || { if [ -f .version ]; then cat .version; else echo dev; fi; })
 BUILD_ID:=$(shell git rev-parse --short HEAD 2>/dev/null || echo "$(shell date +%s)")
 GO ?=go
