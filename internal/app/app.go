@@ -14,6 +14,7 @@ import (
 	"mesos-cli/internal/plugins/composeplugin"
 	"mesos-cli/internal/plugins/configplugin"
 	"mesos-cli/internal/plugins/frameworkplugin"
+	"mesos-cli/internal/plugins/logsplugin"
 	"mesos-cli/internal/plugins/m3splugin"
 	"mesos-cli/internal/plugins/taskplugin"
 )
@@ -23,13 +24,15 @@ type App struct{ registry *plugin.Registry }
 func New(cfg *config.Config, httpClient *http.Client) (*App, error) {
 	registry := plugin.NewRegistry()
 	client := mesos.NewClient(cfg, httpClient)
+	tasks := taskplugin.New(client, cfg, httpClient)
 	builtins := []plugin.Plugin{
 		agentplugin.New(client),
 		composeplugin.New(client, cfg, httpClient),
 		configplugin.New(cfg, registry),
 		frameworkplugin.New(client),
+		logsplugin.New(client, cfg, httpClient),
 		m3splugin.New(client, cfg, httpClient),
-		taskplugin.New(client, cfg, httpClient),
+		tasks,
 	}
 	for _, entry := range builtins {
 		if err := registry.Register(entry); err != nil {

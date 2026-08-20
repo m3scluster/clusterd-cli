@@ -6,7 +6,7 @@ Apache Mesos is a project of the Apache Software Foundation.
 
 ## Features
 
-- Built-in `agent`, `framework`, `task`, `config`, `compose`, and `m3s` command groups
+- Built-in `agent`, `framework`, `task`, `config`, `compose`, `logs`and `m3s` command groups
 - Tabular output for agent, framework, task, Compose task, and M3S framework lists
 - Direct master connections or leader discovery through ZooKeeper
 - Master, agent, and per-framework Basic Authentication
@@ -84,6 +84,12 @@ path = "/mesos"
 ./clusterd-cli framework inspect synthetic-framework-id
 ./clusterd-cli task list --all
 ./clusterd-cli task inspect synthetic-task-id
+./clusterd-cli logs synthetic-task-id
+./clusterd-cli logs -f synthetic-task-id
+./clusterd-cli logs agent synthetic-agent-id
+./clusterd-cli logs -f agent synthetic-agent-id
+./clusterd-cli logs master
+./clusterd-cli logs -f master
 ./clusterd-cli config show
 ./clusterd-cli config plugins
 ```
