@@ -30,7 +30,7 @@ func TestAgentsUsesSlavesEndpointAndBasicAuth(t *testing.T) {
 		if !ok || user != "synthetic-user" || secret != "synthetic-secret" {
 			t.Error("basic auth mismatch")
 		}
-		json.NewEncoder(w).Encode(map[string]any{"slaves": []map[string]any{{"id": "agent-1", "hostname": "node.example.test", "active": true, "pid": "slave(1)@node.example.test:5051"}}})
+		json.NewEncoder(w).Encode(map[string]any{"slaves": []map[string]any{{"id": "agent-1", "hostname": "node.example.test", "active": true, "pid": "slave(1)@127.0.0.1:5051"}}})
 	}))
 	defer server.Close()
 	client := NewClient(testConfig{master: server.URL}, server.Client())
@@ -40,6 +40,10 @@ func TestAgentsUsesSlavesEndpointAndBasicAuth(t *testing.T) {
 	}
 	if len(agents) != 1 || agents[0].ID != "agent-1" || agents[0].Address() != "node.example.test:5051" {
 		t.Fatalf("agents=%+v", agents)
+	}
+	address, err := client.AgentAddress("agent-1")
+	if err != nil || address != "node.example.test:5051" {
+		t.Fatalf("address=%q err=%v", address, err)
 	}
 }
 

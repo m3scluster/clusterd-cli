@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -45,10 +46,20 @@ type Agent struct {
 
 func (a Agent) Address() string {
 	parts := strings.SplitN(a.PID, "@", 2)
-	if len(parts) == 2 {
-		return parts[1]
+	if len(parts) != 2 || a.Hostname == "" {
+		return ""
 	}
-	return ""
+
+	_, port, err := net.SplitHostPort(parts[1])
+	if err != nil {
+		if separator := strings.LastIndex(parts[1], ":"); separator >= 0 {
+			port = parts[1][separator+1:]
+		}
+	}
+	if port == "" {
+		return a.Hostname
+	}
+	return net.JoinHostPort(a.Hostname, port)
 }
 
 type Framework struct {
