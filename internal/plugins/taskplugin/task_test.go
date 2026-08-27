@@ -94,3 +94,13 @@ func TestUpdateMemoryRejectsInvalidValue(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestExecAcceptsCompactInteractiveTTYOptions(t *testing.T) {
+	p := New(fakeClient{tasks: []mesos.Task{runningTask()}}, fakeConfig{}, http.DefaultClient)
+	for _, option := range []string{"-it", "-ti"} {
+		_, err := p.Run([]string{"exec", option, "synthetic-task-1", "sh"}, bytes.NewReader(nil), &bytes.Buffer{}, &bytes.Buffer{})
+		if err == nil || !strings.Contains(err.Error(), "Must be running in a tty") {
+			t.Fatalf("option=%s err=%v", option, err)
+		}
+	}
+}

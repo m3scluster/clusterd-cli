@@ -98,6 +98,9 @@ func (p *TaskPlugin) exec(args []string, stdin io.Reader, stdout, stderr io.Writ
 			interactive = true
 		case "-t", "--tty":
 			tty = true
+		case "-it", "-ti":
+			interactive = true
+			tty = true
 		default:
 			return 1, fmt.Errorf("unknown option: %s", args[0])
 		}

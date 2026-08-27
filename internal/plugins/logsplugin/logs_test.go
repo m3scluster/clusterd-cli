@@ -165,10 +165,10 @@ func TestLogsHelpDocumentsAllTargets(t *testing.T) {
 		t.Fatalf("code=%d err=%v", code, err)
 	}
 	for _, expected := range []string{
-		"clusterd-cli logs [-f | --follow] <mesos-task-id>",
-		"clusterd-cli logs [-f | --follow] task <mesos-task-id>",
-		"clusterd-cli logs [-f | --follow] agent <mesos-agent-id>",
-		"clusterd-cli logs [-f | --follow] master",
+		"clusterd-cli logs [-f | --follow] [-n <number>] <mesos-task-id>",
+		"clusterd-cli logs [-f | --follow] [-n <number>] task <mesos-task-id>",
+		"clusterd-cli logs [-f | --follow] [-n <number>] agent <mesos-agent-id>",
+		"clusterd-cli logs [-f | --follow] [-n <number>] master",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("help missing %q:\n%s", expected, stdout.String())
@@ -248,5 +248,34 @@ func TestAgentLogsFollowAdvancesBothOffsets(t *testing.T) {
 	code, err := plugin.Run([]string{"agent", "synthetic-agent-1", "--follow"}, bytes.NewReader(nil), &stdout, &stderr)
 	if err == nil || code != 1 || calls != 2 || stdout.String() != "A" || stderr.String() != "B" {
 		t.Fatalf("code=%d err=%v calls=%d stdout=%q stderr=%q", code, err, calls, stdout.String(), stderr.String())
+	}
+}
+
+func TestParseArgsSupportsFollowAndLineCountInEitherOrder(t *testing.T) {
+	for _, args := range [][]string{{"-f", "-n", "20", "master"}, {"-n", "20", "-f", "master"}} {
+		follow, lines, positional, err := parseArgs(args)
+		if err != nil || !follow || lines != 20 || len(positional) != 1 || positional[0] != "master" {
+			t.Fatalf("args=%v follow=%v lines=%d positional=%v err=%v", args, follow, lines, positional, err)
+		}
+	}
+}
+
+func TestParseArgsRejectsInvalidLineCount(t *testing.T) {
+	for _, args := range [][]string{{"-n"}, {"-n", "nope"}, {"-n", "-1"}} {
+		if _, _, _, err := parseArgs(args); err == nil {
+			t.Fatalf("args=%v unexpectedly succeeded", args)
+		}
+	}
+}
+
+func TestLineOutputPrintsLastLines(t *testing.T) {
+	var out bytes.Buffer
+	output := newLineOutput(2, &out)
+	_, _ = output.Write([]byte("one\ntwo\nthree\n"))
+	if err := output.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "two\nthree\n" {
+		t.Fatalf("output=%q", out.String())
 	}
 }

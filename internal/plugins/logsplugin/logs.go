@@ -67,40 +67,52 @@ func (p *Plugin) Run(args []string, _ io.Reader, stdout, stderr io.Writer) (int,
 		fmt.Fprint(stdout, help)
 		return 0, nil
 	}
-	follow, positional, err := parseArgs(args)
+	follow, lines, positional, err := parseArgs(args)
 	if err != nil {
 		return 1, err
 	}
 	if len(positional) == 1 && positional[0] == "master" {
-		return p.masterLogs(follow, stdout)
+		return p.masterLogs(follow, lines, stdout)
 	}
 	if len(positional) == 2 && positional[0] == "agent" {
-		return p.agentLogs(positional[1], follow, stdout, stderr)
+		return p.agentLogs(positional[1], follow, lines, stdout, stderr)
 	}
 	if len(positional) == 2 && positional[0] == "task" {
-		return p.taskLogs(positional[1], follow, stdout, stderr)
+		return p.taskLogs(positional[1], follow, lines, stdout, stderr)
 	}
 	if len(positional) == 1 {
-		return p.taskLogs(positional[0], follow, stdout, stderr)
+		return p.taskLogs(positional[0], follow, lines, stdout, stderr)
 	}
 	return 1, fmt.Errorf("invalid logs target; see 'clusterd-cli help logs'")
 }
 
-func parseArgs(args []string) (bool, []string, error) {
+func parseArgs(args []string) (bool, int, []string, error) {
 	follow := false
+	lines := -1
 	positional := make([]string, 0, len(args))
-	for _, arg := range args {
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
 		switch arg {
 		case "-f", "--follow":
 			follow = true
+		case "-n":
+			if index+1 >= len(args) {
+				return false, 0, nil, fmt.Errorf("option -n requires a number")
+			}
+			value, err := strconv.Atoi(args[index+1])
+			if err != nil || value < 0 {
+				return false, 0, nil, fmt.Errorf("option -n requires a non-negative integer")
+			}
+			lines = value
+			index++
 		default:
 			if strings.HasPrefix(arg, "-") {
-				return false, nil, fmt.Errorf("unknown option: %s", arg)
+				return false, 0, nil, fmt.Errorf("unknown option: %s", arg)
 			}
 			positional = append(positional, arg)
 		}
 	}
-	return follow, positional, nil
+	return follow, lines, positional, nil
 }
 
 type logSize uint64
@@ -143,7 +155,50 @@ type agentLogResponse struct {
 	} `json:"read_log"`
 }
 
-func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer) (int, error) {
+type lineOutput struct {
+	limit    int
+	dst      io.Writer
+	buffered bool
+	buffer   bytes.Buffer
+}
+
+func newLineOutput(limit int, dst io.Writer) *lineOutput {
+	return &lineOutput{limit: limit, dst: dst, buffered: limit >= 0}
+}
+
+func (o *lineOutput) Write(data []byte) (int, error) {
+	if !o.buffered {
+		return o.dst.Write(data)
+	}
+	return o.buffer.Write(data)
+}
+
+func (o *lineOutput) Flush() error {
+	if !o.buffered {
+		return nil
+	}
+	o.buffered = false
+	data := o.buffer.Bytes()
+	if o.limit == 0 || len(data) == 0 {
+		return nil
+	}
+	trailingNewline := data[len(data)-1] == '\n'
+	parts := bytes.Split(data, []byte("\n"))
+	if trailingNewline {
+		parts = parts[:len(parts)-1]
+	}
+	if len(parts) > o.limit {
+		parts = parts[len(parts)-o.limit:]
+	}
+	result := bytes.Join(parts, []byte("\n"))
+	if trailingNewline {
+		result = append(result, '\n')
+	}
+	_, err := o.dst.Write(result)
+	return err
+}
+
+func (p *Plugin) agentLogs(agentID string, follow bool, lines int, stdout, stderr io.Writer) (int, error) {
 	address, err := p.client.AgentAddress(agentID)
 	if err != nil {
 		return 1, fmt.Errorf("Unable to resolve agent '%s': %v", agentID, err)
@@ -159,6 +214,9 @@ func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer
 	}
 
 	var stdoutOffset, stderrOffset uint64
+	stdoutOutput := newLineOutput(lines, stdout)
+	stderrOutput := newLineOutput(lines, stderr)
+	output := stdoutOutput
 	for {
 		payload := map[string]any{
 			"type": "READ_LOG",
@@ -182,7 +240,7 @@ func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer
 			if stdoutSize < stdoutOffset {
 				stdoutOffset = 0
 			} else if len(result.ReadLog.Stdout.Data) > 0 {
-				if _, err := stdout.Write(result.ReadLog.Stdout.Data); err != nil {
+				if _, err := stdoutOutput.Write(result.ReadLog.Stdout.Data); err != nil {
 					return 1, err
 				}
 				stdoutOffset += uint64(len(result.ReadLog.Stdout.Data))
@@ -193,7 +251,7 @@ func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer
 			if stderrSize < stderrOffset {
 				stderrOffset = 0
 			} else if len(result.ReadLog.Stderr.Data) > 0 {
-				if _, err := stderr.Write(result.ReadLog.Stderr.Data); err != nil {
+				if _, err := stderrOutput.Write(result.ReadLog.Stderr.Data); err != nil {
 					return 1, err
 				}
 				stderrOffset += uint64(len(result.ReadLog.Stderr.Data))
@@ -202,6 +260,12 @@ func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer
 		if stdoutOffset < stdoutSize || stderrOffset < stderrSize {
 			continue
 		}
+		if err := output.Flush(); err != nil {
+			return 1, err
+		}
+		if err := stderrOutput.Flush(); err != nil {
+			return 1, err
+		}
 		if !follow {
 			return 0, nil
 		}
@@ -209,7 +273,7 @@ func (p *Plugin) agentLogs(agentID string, follow bool, stdout, stderr io.Writer
 	}
 }
 
-func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) (int, error) {
+func (p *Plugin) taskLogs(taskID string, follow bool, lines int, stdout, stderr io.Writer) (int, error) {
 	tasks, err := p.client.Tasks(url.Values{"task_id": {taskID}})
 	if err != nil {
 		return 1, fmt.Errorf("Unable to get task with ID %s: %v", taskID, err)
@@ -246,6 +310,9 @@ func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) 
 	}
 
 	var stdoutOffset, stderrOffset uint64
+	stdoutOutput := newLineOutput(lines, stdout)
+	stderrOutput := newLineOutput(lines, stderr)
+	output := stdoutOutput
 	for {
 		payload := map[string]any{
 			"type": "READ_LOG",
@@ -270,7 +337,7 @@ func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) 
 			if stdoutSize < stdoutOffset {
 				stdoutOffset = 0
 			} else if len(result.ReadLog.Stdout.Data) > 0 {
-				if _, err := stdout.Write(result.ReadLog.Stdout.Data); err != nil {
+				if _, err := stdoutOutput.Write(result.ReadLog.Stdout.Data); err != nil {
 					return 1, err
 				}
 				stdoutOffset += uint64(len(result.ReadLog.Stdout.Data))
@@ -281,7 +348,7 @@ func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) 
 			if stderrSize < stderrOffset {
 				stderrOffset = 0
 			} else if len(result.ReadLog.Stderr.Data) > 0 {
-				if _, err := stderr.Write(result.ReadLog.Stderr.Data); err != nil {
+				if _, err := stderrOutput.Write(result.ReadLog.Stderr.Data); err != nil {
 					return 1, err
 				}
 				stderrOffset += uint64(len(result.ReadLog.Stderr.Data))
@@ -290,6 +357,12 @@ func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) 
 		if stdoutOffset < stdoutSize || stderrOffset < stderrSize {
 			continue
 		}
+		if err := output.Flush(); err != nil {
+			return 1, err
+		}
+		if err := stderrOutput.Flush(); err != nil {
+			return 1, err
+		}
 		if !follow {
 			return 0, nil
 		}
@@ -297,12 +370,13 @@ func (p *Plugin) taskLogs(taskID string, follow bool, stdout, stderr io.Writer) 
 	}
 }
 
-func (p *Plugin) masterLogs(follow bool, stdout io.Writer) (int, error) {
+func (p *Plugin) masterLogs(follow bool, lines int, stdout io.Writer) (int, error) {
 	master, err := p.config.Master()
 	if err != nil {
 		return 1, err
 	}
 	var offset uint64
+	output := newLineOutput(lines, stdout)
 	for {
 		payload := map[string]any{
 			"type":     "READ_LOG",
@@ -325,13 +399,16 @@ func (p *Plugin) masterLogs(follow bool, stdout io.Writer) (int, error) {
 		if size < offset {
 			offset = 0
 		} else if len(result.ReadLog.Data) > 0 {
-			if _, err := stdout.Write(result.ReadLog.Data); err != nil {
+			if _, err := output.Write(result.ReadLog.Data); err != nil {
 				return 1, err
 			}
 			offset += uint64(len(result.ReadLog.Data))
 		}
 		if offset < size {
 			continue
+		}
+		if err := output.Flush(); err != nil {
+			return 1, err
 		}
 		if !follow {
 			return 0, nil
@@ -369,12 +446,13 @@ func (p *Plugin) post(client *http.Client, endpoint, user, secret string, payloa
 const help = `Reads task, agent, and master logs
 
 Usage:
-  clusterd-cli logs [-f | --follow] <mesos-task-id>
-  clusterd-cli logs [-f | --follow] task <mesos-task-id>
-  clusterd-cli logs [-f | --follow] agent <mesos-agent-id>
-  clusterd-cli logs [-f | --follow] master
+  clusterd-cli logs [-f | --follow] [-n <number>] <mesos-task-id>
+  clusterd-cli logs [-f | --follow] [-n <number>] task <mesos-task-id>
+  clusterd-cli logs [-f | --follow] [-n <number>] agent <mesos-agent-id>
+  clusterd-cli logs [-f | --follow] [-n <number>] master
 
 Options:
   -f --follow  Continue printing new log output.
+  -n <number>  Print only the last <number> lines.
   -h --help    Show this screen.
 `
