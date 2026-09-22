@@ -29,6 +29,7 @@ type TaskPlugin struct {
 	client TaskClient
 	config Configuration
 	http   *http.Client
+	stream *http.Client
 }
 
 func New(client TaskClient, config Configuration, httpClient *http.Client) *TaskPlugin {
@@ -37,7 +38,9 @@ func New(client TaskClient, config Configuration, httpClient *http.Client) *Task
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: !config.AgentSSLVerify()}
 		httpClient = &http.Client{Transport: transport, Timeout: time.Duration(config.AgentTimeout()) * time.Second}
 	}
-	return &TaskPlugin{client: client, config: config, http: httpClient}
+	streamClient := *httpClient
+	streamClient.Timeout = 0
+	return &TaskPlugin{client: client, config: config, http: httpClient, stream: &streamClient}
 }
 func (*TaskPlugin) Name() string        { return "task" }
 func (*TaskPlugin) Description() string { return "Interacts with the tasks running in a Mesos cluster" }

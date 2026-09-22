@@ -136,7 +136,7 @@ func newUUID() string {
 	encoded := hex.EncodeToString(raw[:])
 	return encoded[0:8] + "-" + encoded[8:12] + "-" + encoded[12:16] + "-" + encoded[16:20] + "-" + encoded[20:32]
 }
-func (s *taskIO) request(message map[string]any, accept string, body io.Reader) (*http.Response, error) {
+func (s *taskIO) request(message map[string]any, accept string, body io.Reader, streaming bool) (*http.Response, error) {
 	if body == nil {
 		data, err := json.Marshal(message)
 		if err != nil {
@@ -155,7 +155,11 @@ func (s *taskIO) request(message map[string]any, accept string, body io.Reader) 
 	if user, secret, ok := s.plugin.config.AgentAuthentication(); ok {
 		req.SetBasicAuth(user, secret)
 	}
-	resp, err := s.plugin.http.Do(req)
+	client := s.plugin.http
+	if streaming {
+		client = s.plugin.stream
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +173,7 @@ func (s *taskIO) request(message map[string]any, accept string, body io.Reader) 
 func (s *taskIO) output(kind string, payload map[string]any, interactive bool) error {
 	key := strings.ToLower(kind)
 	message := map[string]any{"type": kind, key: payload}
-	resp, err := s.request(message, "application/recordio", nil)
+	resp, err := s.request(message, "application/recordio", nil, interactive)
 	if err != nil {
 		return err
 	}
@@ -230,7 +234,7 @@ func (s *taskIO) output(kind string, payload map[string]any, interactive bool) e
 }
 func (s *taskIO) wait() (int, error) {
 	message := map[string]any{"type": "WAIT_CONTAINER", "wait_container": map[string]any{"container_id": s.containerID}}
-	resp, err := s.request(message, "application/json", nil)
+	resp, err := s.request(message, "application/json", nil, false)
 	if err != nil {
 		return 1, fmt.Errorf("Error waiting for command to complete: %v", err)
 	}
@@ -354,7 +358,7 @@ func (s *taskIO) inputRequest(body io.Reader) (*http.Response, error) {
 	if user, secret, ok := s.plugin.config.AgentAuthentication(); ok {
 		req.SetBasicAuth(user, secret)
 	}
-	return s.plugin.http.Do(req)
+	return s.plugin.stream.Do(req)
 }
 func (s *taskIO) streamInput(resize <-chan [2]int, detectExit bool) error {
 	handshake, err := s.inputRequest(bytes.NewReader(s.initialInput()))
